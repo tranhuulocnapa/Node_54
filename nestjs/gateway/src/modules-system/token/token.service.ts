@@ -40,7 +40,7 @@ export class TokenService {
     return refreshToken;
   }
 
-  verifyAccessToken(acccessToken, option) {
+  verifyAccessToken(acccessToken, option?: jwt.VerifyOptions) {
     const decode = jwt.verify(
       acccessToken,
       ACCESS_TOKEN_SECRET as string,
@@ -48,7 +48,7 @@ export class TokenService {
     );
     return decode;
   }
-  verifyRefreshToken(refreshToken, option) {
+  verifyRefreshToken(refreshToken, option?: jwt.VerifyOptions) {
     const decode = jwt.verify(
       refreshToken,
       REFRESH_TOKEN_SECRET as string,

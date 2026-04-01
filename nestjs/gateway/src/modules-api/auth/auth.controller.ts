@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import type { Response } from 'express';
+import { Public } from 'src/common/decorrator/public.decorator';
+import { User } from 'src/common/decorrator/user.decorator';
 
 // class BodyDto {
 //   email: string;
@@ -13,6 +15,7 @@ export class AuthController {
   constructor(private AuthService: AuthService) {}
 
   @Post('login')
+  @Public()
   async login(
     @Body()
     body: LoginDto,
@@ -27,7 +30,8 @@ export class AuthController {
   }
 
   @Get('get-info')
-  getinfo() {
+  getInfo(@User() User) {
+    console.log('getInfo', User);
     return 'user';
   }
 }
