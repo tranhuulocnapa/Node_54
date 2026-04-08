@@ -10,7 +10,6 @@ export class EmailController {
 
   @EventPattern('createEmail')
   create(@Payload() createEmailDto: CreateEmailDto) {
-    console.log({createEmailDto});
     return this.emailService.create(createEmailDto);
   }
 
@@ -25,7 +24,7 @@ export class EmailController {
   }
 
   @MessagePattern('updateEmail')
-  update(@Payload() updateEmailDto: UpdateEmailDto) {
+  update(@Payload() updateEmailDto: any) {
     return this.emailService.update(updateEmailDto.id, updateEmailDto);
   }
 
