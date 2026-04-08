@@ -10,10 +10,11 @@ import { transporter } from './common/nodemailer/inite.nodemailer';
   providers: [AppService],
 })
 export class AppModule implements OnModuleInit {
-  async onModuleInit() {
+  onModuleInit() {
     try {
-      await transporter.verify();
-      console.log('Server is ready to take our messages');
+      transporter.verify().then(() => {
+        console.log('✅ Server is ready to take our messages');
+      });
     } catch (err) {
       console.error('Verification failed:', err);
     }

@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { CreateEmailDto } from './dto/create-email.dto';
 import { UpdateEmailDto } from './dto/update-email.dto';
-import { transporter } from '../../common/nodemailer/inite.nodemailer';
+
 import * as nodemailer from 'nodemailer';
+import { HttpService } from '@nestjs/axios';
+import { transporter } from '../../common/nodemailer/inite.nodemailer';
 
 @Injectable()
 export class EmailService {
+  constructor(private readonly httpService: HttpService) {}
+
   async create(createEmailDto: CreateEmailDto) {
     try {
       const createOrderId = createEmailDto.id;
@@ -13,20 +17,40 @@ export class EmailService {
       const fullName = createEmailDto.Users.fullName;
       const foodName = createEmailDto.Foods.name;
 
+      const prompt = `
+      Khách hàng tên ${fullName} vừa mua món ${foodName}.
+      ${foodName} là tên sản phẩm
+
+      Bạn là một nhân viên chăm sóc khách hàng.
+      Hãy viết đúng 1 câu cảm ơn ngắn gọn, chân thành, lịch sử bằng tiếng Việt để gửi cho khách hàng.
+      Chỉ trả ra nội dung cảm ơn, không giải thích thêm.
+      `;
+
+      const { data } = await this.httpService.axiosRef.post(
+        'http://localhost:11434/api/generate',
+        {
+          model: 'llama3.2',
+          prompt: prompt,
+          stream: false,
+        },
+      );
+
+      console.log(data);
+
       const info = await transporter.sendMail({
         from: 'tranhuulocnapa@gmail.com', // sender address
+        // to: email, // list of recipients
         to: 'tranhuulocnapa@gmail.com', // list of recipients
         subject: 'Notification Order', // subject line
-        text: `Create order id: ${createOrderId}, food: ${foodName}`, // plain text body
+        text: `Create Order Id: ${createOrderId}, food: ${foodName}`, // plain text body
         html: `
-         <div>
+          <div>
             <h3>Đặt hàng thành công</h3>          
             <p>Đơn hàng mã: ${createOrderId}</p>
             <p>Sản phẩm: ${foodName}</p>
-            <p>Cảm ơn bạn ${fullName} đã đặt hàng</p>
+            <p>${data.response}/p>
           </div>
-        
-                `, // HTML body
+        `, // HTML body
       });
 
       console.log('Message sent: %s', info.messageId);
