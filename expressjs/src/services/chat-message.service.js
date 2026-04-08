@@ -1,82 +1,55 @@
+import { buildQueryPrisma } from "../common/helpers/build-query-prisma.helper.js";
+import { prisma } from "../common/prisma/connect.prisma.js";
+
 export const chatMessageService = {
-  async create(req) {
-    return `This action create`;
-  },
+   async create(req) {
+      return `This action create`;
+   },
 
-  async findAll(req) {
-    //phân trang
-    const pageDefault = 1;
-    const pageSizeDefault = 3;
-    const query = req.query;
-    let page = Number(query.page) || pageDefault;
-    let pageSize = Number(query.pageSize) || pageSizeDefault;
-    if (page < 1) page = pageDefault;
-    if (pageSize < 1) pageSize = pageSizeDefault;
-    const skip = (page - 1) * pageSize;
+   async findAll(req) {
+        // sequelize
+        // const resultSequelize = await Article.findAll();
 
-    //filter
+        const { index, page, pageSize, where } = buildQueryPrisma(req);
 
-    let { filters } = req.query || {};
+        const resultPrismaPromise = prisma.chatMessages.findMany({
+            where: where,
+            skip: index, // skip tương đương với OFFSET
+            take: pageSize, // take tương đương với LIMIT
+            include: {
+                Users: true,
+            },
+            orderBy: {
+                createdAt: "desc"
+            }
+        });
+        const totalItemPromise = prisma.chatMessages.count({
+            // ở findMany mà where cái gì thì đưa vào count giống như vậy
+            where: where,
+        });
 
-    try {
-      filters = JSON.parse(filters);
-    } catch (error) {
-      filters = {};
-    }
+        const [resultPrisma, totalItem] = await Promise.all([resultPrismaPromise, totalItemPromise]);
 
-    Object.entries(filters).forEach(([key, value]) => {
-      // console.log({ key, value });
-      if (typeof value === "string") {
-        filters[key] = {
-          contains: value,
+        const totalPage = Math.ceil(totalItem / pageSize);
+
+        return {
+            totalItem: totalItem,
+            totalPage: totalPage,
+            page: page,
+            pageSize: pageSize,
+            items: resultPrisma,
         };
-      }
-    });
+    },
 
-    const result = await prisma.chatMessage.findMany({
-      where: {
-        ChatGroupMembers: {
-          some: {
-            userId: req.user.id,
-          },
-        },
-      },
-      skip: skip,
-      take: pageSize,
-      include: {
-        ChatGroupMembers: {
-          include: {
-            Users: true,
-          },
-        },
-      },
-    });
-    console.log(filters);
-    const totalPage = await prisma.chatGroups.count({
-      where: {
-        ...filters,
-        isDeleted: false,
-      },
-    });
-    const totalPageSize = Math.ceil(totalPage / pageSize);
-    return {
-      totalPage: totalPage,
-      totalPageSize: totalPageSize,
-      page: page,
-      pageSize: pageSize,
-      items: result,
-    };
-  },
+   async findOne(req) {
+      return `This action returns a id: ${req.params.id} chatMessage`;
+   },
 
-  async findOne(req) {
-    return `This action returns a id: ${req.params.id} chatMessage`;
-  },
+   async update(req) {
+      return `This action updates a id: ${req.params.id} chatMessage`;
+   },
 
-  async update(req) {
-    return `This action updates a id: ${req.params.id} chatMessage`;
-  },
-
-  async remove(req) {
-    return `This action removes a id: ${req.params.id} chatMessage`;
-  },
+   async remove(req) {
+      return `This action removes a id: ${req.params.id} chatMessage`;
+   }
 };

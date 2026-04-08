@@ -1,58 +1,63 @@
+
+/**
+ * query:
+ * https://swagger.io/docs/specification/v3_0/adding-examples/#parameter-examples
+ * 
+ * path:
+ * https://swagger.io/docs/specification/v3_0/paths-and-operations/#operations
+ */
+
 export const article = {
-  "/article": {
-    get: {
-      tags: ["Article"],
-      summary: "Returns a list of article.",
-      parameters: [
-        {
-          in: "query",
-          name: "page",
-          schema: {
-            type: "string",
-
-            example: "1",
-          },
+    "/article": {
+        get: {
+            tags: ["Article"],
+            summary: "Returns a list of article.",
+            description: "Optional extended description in CommonMark or HTML.",
+            parameters: [
+                {
+                    in: "query",
+                    name: "page",
+                    schema: {
+                        type: "integer",
+                        example: "1",
+                    },
+                },
+                {
+                    in: "query",
+                    name: "pageSize",
+                    schema: {
+                        type: "integer",
+                        example: "3",
+                    },
+                },
+            ],
+            responses: {
+                200: {
+                    description: "ok",
+                },
+            },
         },
-        {
-          in: "query",
-          name: "pageSie",
-          schema: {
-            type: "string",
-
-            example: "10",
-          },
-        },
-      ],
-      description: "Optional extended description in CommonMark or HTML.",
-      responses: {
-        200: {
-          description: "ok",
-        },
-      },
     },
-  },
-
-  "/article/{id}": {
-    get: {
-      tags: ["Article"],
-      summary: "Returns a list of article.",
-      parameters: [
-        {
-          in: "path",
-          name: "id",
-          schema: {
-            type: "string",
-
-            example: "1",
-          },
+    "/article/{id}": {
+        get: {
+            tags: ["Article"],
+            summary: "Returns a list of article.",
+            description: "Optional extended description in CommonMark or HTML.",
+            parameters: [
+                {
+                    in: "path",
+                    name: "id",
+                    schema: {
+                        type: "integer",
+                        example: "1",
+                    },
+                },
+            ],
+            responses: {
+                200: {
+                    description: "ok",
+                },
+            },
         },
-      ],
-      description: "Optional extended description in CommonMark or HTML.",
-      responses: {
-        200: {
-          description: "ok",
-        },
-      },
     },
-  },
 };

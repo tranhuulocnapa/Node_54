@@ -1,17 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Req,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseInterceptors } from '@nestjs/common';
 import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
-import { updateArticleDto } from './dto/update-article.dto';
+import { UpdateArticleDto } from './dto/update-article.dto';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @Controller('article')
@@ -25,7 +15,7 @@ export class ArticleController {
 
   @Get()
   @UseInterceptors(CacheInterceptor)
-  @CacheTTL(2000)
+  @CacheTTL(500)
   findAll(@Req() req) {
     return this.articleService.findAll(req);
   }
@@ -36,7 +26,7 @@ export class ArticleController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateArticleDto: updateArticleDto) {
+  update(@Param('id') id: string, @Body() updateArticleDto: UpdateArticleDto) {
     return this.articleService.update(+id, updateArticleDto);
   }
 

@@ -1,18 +1,26 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { PrismaService } from 'src/modules-system/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { TokenService } from 'src/modules-system/token/token.service';
+import { Request } from 'express';
+import { TotpService } from '../totp/totp.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private tokenService: TokenService,
+    private totpService: TotpService,
   ) {}
+
   async login(body: LoginDto) {
     // nhận dữ liệu
-    const { email, password } = body;
+    const { email, password, token } = body;
 
     // kiểm tra email xem tồn tại chưa
     // nếu chưa tồn tại => từ chối, kêu người dùng đăng ký
@@ -22,7 +30,7 @@ export class AuthService {
         email: email,
       },
       omit: {
-        passWork: false,
+        password: false,
       },
     });
 
@@ -31,12 +39,32 @@ export class AuthService {
       throw new BadRequestException('Người chưa tồn tại, vui lòng đăng ký');
     }
 
-    //nếu lần đầu đăng nhập gg, lần 2 quên đăng nhập bằng mật khẩu thì k đươc, nên phải đăng nhập bằng gg
-    if (!userExist.passWork) {
-      throw new BadRequestException('cần đăng nhập gg để cập lần pass');
+    if (!userExist.password) {
+      throw new BadRequestException(
+        'Cần đăng nhập bằng google để cập nhật mật khẩu',
+      );
     }
 
-    const isPassword = bcrypt.compareSync(password, userExist.passWork); // true
+    // chỉ kiểm tra TOTP
+    console.log({ userExist });
+    if (userExist.totpSecret) {
+      if (token) {
+        // FE gọi api login lần 2
+        const { valid } = await this.totpService.totp.verify(token, {
+          secret: userExist.totpSecret,
+        });
+
+        if (!valid) {
+          throw new BadRequestException('Verify TOTP invalid');
+        }
+      } else {
+        // FE gọi api login lần 1
+        console.log('/ FE gọi api login lần 1');
+        return { isTotp: true };
+      }
+    }
+
+    const isPassword = bcrypt.compareSync(password, userExist.password); // true
 
     if (!isPassword) {
       // throw new BadRequestException("Account Invalid..");
@@ -54,8 +82,60 @@ export class AuthService {
     };
   }
 
-  // login(body: LoginDto) {
-  //   console.log({ body });
-  //   return 'login';
-  // }
+  async refreshToken(req: Request) {
+    const { accessToken, refreshToken } = req.cookies;
+
+    if (!accessToken) {
+      throw new UnauthorizedException('Không có accessToken để kiểm tra');
+    }
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Không có refreshToken để kiểm tra.');
+    }
+
+    // tại vì accessToken đang bị hết hạn, FE đang muốn làm mới
+    // cho nên không được kiểm tra hạn của accessToken { ignoreExpiration: true }
+    const decodeAccessToken: any = this.tokenService.verifyAccessToken(
+      accessToken,
+      {
+        ignoreExpiration: true,
+      },
+    );
+    const decodeRefreshToken: any =
+      this.tokenService.verifyRefreshToken(refreshToken);
+
+    if (decodeAccessToken.userId !== decodeRefreshToken.userId) {
+      throw new UnauthorizedException('Token không hợp lệ..');
+    }
+
+    const userExits = await this.prisma.users.findUnique({
+      where: {
+        id: decodeAccessToken.userId,
+      },
+    });
+
+    if (!userExits) {
+      throw new UnauthorizedException('Không tìm thấy user trong db');
+    }
+
+    const accessTokenNew = this.tokenService.createAccessToken(userExits.id);
+    const refreshTokenNew = this.tokenService.createRefreshToken(userExits.id);
+
+    // thời hạn của refreshToken là 1 ngày
+
+    // Trường hợp 1: trả về cả cặp 2 token (rotate)
+    // refreshToken luôn được làm mới: tự động gia hạn thời gian login
+    // nếu trong 1 ngày, người dùng này không sử dụng => logout
+
+    // Trường hợp 2: trả về 1 accessToken
+    // refreshToken sẽ không được gia hạn
+    // đúng 1 ngày người dùng sẽ luôn phải login lại
+
+    // console.log({ accessToken, refreshToken, decodeAccessToken, decodeRefreshToken, userExits });
+
+    return {
+      accessToken: accessTokenNew,
+      refreshToken: refreshTokenNew,
+    };
+  }
 }

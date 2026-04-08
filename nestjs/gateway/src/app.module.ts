@@ -5,14 +5,21 @@ import { AuthModule } from './modules-api/auth/auth.module';
 import { PrismaModule } from './modules-system/prisma/prisma.module';
 import { TokenModule } from './modules-system/token/token.module';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ProtectGuard } from './guards/protect.guards';
+import { ProtectGuard } from './common/guards/protect.guard';
+import { RoleGuard } from './common/guards/role.guard';
 import { ArticleModule } from './modules-api/article/article.module';
-import { LoggingInterceptor } from './common/inrercerter/loggin.intercepter';
-import { ResponseSuccessInterceptor } from './common/inrercerter/response-success.intercepter';
+import { LoggingInterceptor } from './common/interceptos/logging.interceptor';
+import { ResponseSuccessInterceptor } from './common/interceptos/response-success.interceptor';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { REDIS_URL } from './common/constant/app.constant';
 import type { Cache } from 'cache-manager';
+import { ElasticSearchModule } from './modules-system/elastic-search/elastic-search.module';
+import { ElasticsearchService } from '@nestjs/elasticsearch';
+import { SearchAppModule } from './modules-api/search-app/search-app.module';
+import { TotpModule } from './modules-api/totp/totp.module';
+import { OrderModule } from './modules-api/order/order.module';
+import { RabbitMqModule } from './modules-system/rabbit-mq/rabbit-mq.module';
 
 @Module({
   imports: [
@@ -24,6 +31,11 @@ import type { Cache } from 'cache-manager';
       isGlobal: true,
       stores: [new KeyvRedis(REDIS_URL)],
     }),
+    ElasticSearchModule,
+    SearchAppModule,
+    TotpModule,
+    OrderModule,
+    RabbitMqModule,
   ],
   controllers: [AppController],
   providers: [
@@ -31,6 +43,10 @@ import type { Cache } from 'cache-manager';
     {
       provide: APP_GUARD,
       useClass: ProtectGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
     },
     {
       provide: APP_INTERCEPTOR,
@@ -43,10 +59,24 @@ import type { Cache } from 'cache-manager';
   ],
 })
 export class AppModule {
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+  constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly elasticsearchService: ElasticsearchService,
+  ) {}
+
   async onModuleInit() {
     try {
-      await this.cacheManager.get('heathcheck');
-    } catch (error) {}
+      await this.cacheManager.get('healthcheck');
+      console.log('✅ [REDIS] Kết nối thành công');
+    } catch (error) {
+      console.log({ cacheManager: error });
+    }
+
+    try {
+      const reuslt = await this.elasticsearchService.ping()
+      console.log('✅ [ELASTIC-SEARCH] Kết nối thành công', reuslt);
+    } catch (error) {
+      console.log({ elasticSearch: error });
+    }
   }
 }

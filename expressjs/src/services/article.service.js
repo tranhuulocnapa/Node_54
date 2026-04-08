@@ -1,117 +1,120 @@
-import { prisma } from "../common/prisma/generated/connect.prisma.js";
+import { buildQueryPrisma } from "../common/helpers/build-query-prisma.helper.js";
+import { prisma } from "../common/prisma/connect.prisma.js";
+import sequelize from "../common/sequelize/connect.sequelize.js";
+import Article from "../models/article.model.js";
 
-// {{domain}}/article?page=2&pagesize=3
+// 4 nơi nhận dữ liệu từ FE gửi
+// BODY
+// PARAMS
+// QUERY
+// HEADERS
 
-export const articleService = {
-  async create(req) {
-    const body = req.body;
-    await prisma.articles.create({
-      data: {
-        title: body.title,
-        content: body.content,
-        userId: 1,
-      },
-    });
+export const artcileService = {
+    // QUERY:
+    // Thường dùng: phân trang, lọc. tìm kiếm...
+    async findAll(req) {
+        // sequelize
+        // const resultSequelize = await Article.findAll();
 
-    return true;
-  },
+        const { index, page, pageSize, where } = buildQueryPrisma(req);
 
-  async findAll(req) {
-    //phân trang
-    const pageDefault = 1;
-    const pageSizeDefault = 3;
-    const query = req.query;
-    let page = Number(query.page) || pageDefault;
-    let pageSize = Number(query.pageSize) || pageSizeDefault;
-    if (page < 1) page = pageDefault;
-    if (pageSize < 1) pageSize = pageSizeDefault;
-    const skip = (page - 1) * pageSize;
+        const resultPrismaPromise = prisma.articles.findMany({
+            where: where,
+            skip: index, // skip tương đương với OFFSET
+            take: pageSize, // take tương đương với LIMIT
+            include: {
+                Users: true,
+            },
+        });
+        const totalItemPromise = prisma.articles.count({
+            // ở findMany mà where cái gì thì đưa vào count giống như vậy
+            where: where,
+        });
 
-    //filter
+        const [resultPrisma, totalItem] = await Promise.all([resultPrismaPromise, totalItemPromise]);
 
-    let { filters } = req.query || {};
+        const totalPage = Math.ceil(totalItem / pageSize);
 
-    try {
-      filters = JSON.parse(filters);
-    } catch (error) {
-      filters = {};
-    }
-
-    Object.entries(filters).forEach(([key, value]) => {
-      // console.log({ key, value });
-      if (typeof value === "string") {
-        filters[key] = {
-          contains: value,
+        return {
+            totalItem: totalItem,
+            totalPage: totalPage,
+            page: page,
+            pageSize: pageSize,
+            items: resultPrisma,
         };
-      }
-    });
+    },
 
-    const result = await prisma.articles.findMany({
-      where: {
-        ...filters,
-        isDeleted: false,
-      },
-      skip: skip,
-      take: pageSize,
-    });
-    console.log(filters);
-    const totalPage = await prisma.articles.count({
-      where: {
-        ...filters,
-        isDeleted: false,
-      },
-    });
-    const totalPageSize = Math.ceil(totalPage / pageSize);
-    return {
-      totalPage: totalPage,
-      totalPageSize: totalPageSize,
-      page: page,
-      pageSize: pageSize,
-      items: result,
-    };
-  },
+    async findOne(req) {
+        const { articleId } = req.params;
+        
+        const article = await prisma.articles.findUnique({
+            where: {
+                id: Number(articleId)
+            }
+        })
 
-  async findOne(req) {
-    const { id } = req.params;
+        return article
+    },
 
-    const article = await prisma.articles.findUnique({
-      where: {
-        id: Number(id),
-      },
-    });
+    // Body
+    // để nhận được body phải thiết lập middleware json ở server.js
+    // app.use(express.json())
+    async create(req) {
+        const body = req.body;
 
-    return article;
-  },
+        console.log({ body });
 
-  async update(req) {
-    const body = req.body;
-    const id = req.params.id;
-    const articleUpdate = await prisma.articles.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        title: body.title,
-        content: body.content,
-      },
-    });
+        const articleNew = await prisma.articles.create({
+            data: {
+                title: body.title,
+                content: body.content,
+                userId: 1,
+            },
+        });
 
-    return true;
-  },
+        return true;
+    },
+    // PARAMSMETER
+    // Thường dùng để gửi id, lấy detail, update, delete
+    async update(req) {
+        const { articleId } = req.params;
+        const body = req.body;
 
-  async remove(req) {
-    const id = req.params.id;
-    await prisma.articles.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        isDeleted: true,
-        createdAt: new Date(),
-        deletedBy: 1,
-      },
-    });
+        const articleUpdate = await prisma.articles.update({
+            where: {
+                id: Number(articleId),
+            },
+            data: {
+                title: body.title,
+                content: body.content,
+            },
+        });
 
-    return true;
-  },
+        console.log({ articleId, body });
+
+        return true;
+    },
+    async delete(req) {
+        const { articleId } = req.params;
+
+        // delete thật trong DB: không nên saif
+        // await prisma.articles.delete({
+        //     where: {
+        //         id: articleId,
+        //     },
+        // });
+
+        await prisma.articles.update({
+            where: {
+                id: +articleId,
+            },
+            data: {
+                isDeleted: true,
+                deletedAt: new Date(),
+                deletedBy: 1,
+            },
+        });
+
+        return true;
+    },
 };

@@ -11,6 +11,9 @@ CREATE DATABASE IF NOT EXISTS cyber_community;
 DROP DATABASE IF EXISTS demo_1;
 DROP DATABASE IF EXISTS demo_2;
 
+ALTER TABLE `Users`
+ADD COLUMN `password` VARCHAR(255)
+
 -- table
 CREATE TABLE `User` (
 	`id` INT PRIMARY KEY AUTO_INCREMENT,
@@ -19,7 +22,8 @@ CREATE TABLE `User` (
 	`avatar` TEXT,
 	`age` INT,
 	`totpSecret` VARCHAR(255),
-	`googleId` VARCHAR(255)
+	`googleId` VARCHAR(255),
+	`password` VARCHAR(255),
 )
 
 -- đổi tên TABLE
@@ -234,7 +238,6 @@ CREATE TABLE IF NOT EXISTS `Users` (
 	
 	`email` VARCHAR(255) NOT NULL UNIQUE,
 	`fullName` VARCHAR(255),
-	`passWork` VARCHAR(255),
 	`avatar` TEXT,
 	`age` INT,
 	`totpSecret` VARCHAR(255),
@@ -374,8 +377,6 @@ VALUES
 	);
 
 
-
-
 CREATE TABLE IF NOT EXISTS `ChatGroups` (
 	`id` INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
 	-- mặc định luôn luôn có
@@ -420,3 +421,7 @@ CREATE TABLE IF NOT EXISTS `ChatMessages` (
 	`createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	`updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+
+
+

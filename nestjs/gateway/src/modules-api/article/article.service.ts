@@ -1,9 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
-
+import { UpdateArticleDto } from './dto/update-article.dto';
+import { buildQueryPrisma } from 'src/common/helpers/build-query-prisma.helper';
 import { PrismaService } from 'src/modules-system/prisma/prisma.service';
-import { buildQueryPrisma } from 'src/common/helper/build-query-prisma.helper';
-import { updateArticleDto } from './dto/update-article.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 
@@ -11,7 +10,7 @@ import type { Cache } from 'cache-manager';
 export class ArticleService {
   constructor(
     private prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    // @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   create(createArticleDto: CreateArticleDto) {
@@ -22,11 +21,12 @@ export class ArticleService {
     // sequelize
     // const resultSequelize = await Article.findAll();
 
-    const value = await this.cacheManager.get('article');
-    if (value) {
-      return value;
-    }
-    
+    // kiểm tra trong ram nếu có thì trả về luôn
+    // const value = await this.cacheManager.get('article');
+    // if (value) {
+    //   return value;
+    // }
+
     const { index, page, pageSize, where } = buildQueryPrisma(req);
 
     const resultPrismaPromise = this.prisma.articles.findMany({
@@ -57,7 +57,8 @@ export class ArticleService {
       items: resultPrisma,
     };
 
-    await this.cacheManager.set('articlle', 'result');
+    // await this.cacheManager.set('article', result);
+    // console.dir(this.cacheManager.stores, { colors: true, depth: null });
 
     return result;
   }
@@ -66,7 +67,7 @@ export class ArticleService {
     return `This action returns a #${id} article`;
   }
 
-  update(id: number, updateArticleDto: updateArticleDto) {
+  update(id: number, updateArticleDto: UpdateArticleDto) {
     return `This action updates a #${id} article`;
   }
 

@@ -1,100 +1,138 @@
-import { BadRequestException } from "../common/helpers/exception.helper.js";
-import { prisma } from "../common/prisma/generated/connect.prisma.js";
+import { BadRequestException, UnauthorizedException } from "../common/helpers/exception.helper.js";
+import { prisma } from "../common/prisma/connect.prisma.js";
 import bcrypt from "bcrypt";
-import { tokenService } from "./token.sever.js";
-import { ref } from "node:process";
+import { tokenService } from "./token.service.js";
 
 export const authService = {
-  async register(req) {
-    const { fullName, passwork, email } = req.body;
+    async register(req) {
+        // nhận dữ liệu từ FE gửi lên
+        const { email, password, fullName } = req.body;
 
-    const userExits = await prisma.users.findUnique({
-      where: {
-        email: email,
-      },
-    });
+        // kiểm tra email có tồn tại trong db hay không
+        const userExits = await prisma.users.findUnique({
+            where: {
+                email: email,
+            },
+        });
 
-    if (userExits) {
-      throw new BadRequestException("tài khoản đã tồn tại");
-    }
+        // nếu người dùng tồn tại thì từ chối
+        if (userExits) {
+            throw new BadRequestException("Người dùng đã tồn tại, vui lòng đăng nhập");
+        }
 
-    const passWorkhash = bcrypt.hashSync(passwork, 10);
-    await prisma.users.create({
-      data: {
-        fullName: fullName,
-        passwork: passWorkhash,
-        email: email,
-      },
-    });
+        // HASH: băm => bcrypt
+        // không thể dịch ngược
+        // so sánh
 
-    console.log({ fullName, passWorkhash, email, userExits });
+        // ENCRYPTION: mã hoá
+        // dịch ngược
 
-    return true;
-  },
-  async login(req) {
-    const { email, password } = req.body;
-    const userExits = await prisma.users.findUnique({
-      where: {
-        email: email,
-      },
-      omit: { passWork: false },
-    });
+        const passwordHash = bcrypt.hashSync(password, 10);
 
-    if (!userExits) {
-      throw new BadRequestException("tài khoản không tồn tại");
-    }
+        // tạo mới người dùng vào db
+        const userNew = await prisma.users.create({
+            data: {
+                email: email,
+                password: passwordHash,
+                fullName: fullName,
+            },
+        });
 
-    const isPassWork = bcrypt.compareSync(password, userExits.passWork);
-    if (!isPassWork) {
-      throw new BadRequestException("mật khẩu không đúng");
-    }
-    const accessToken = tokenService.createAccessToken(userExits.id);
-    const refreshToken = tokenService.createRefreshToken(userExits.id);
+        // console.log({ email, password, fullName, userExits, userNew });
 
-    console.log(email, password, userExits);
-    return {
-      accessToken,
-      refreshToken: refreshToken,
-    };
-  },
+        return true;
+    },
 
-  async getInfo(req) {
-    return req.user;
-  },
+    async login(req) {
+        // nhận dữ liệu
+        const { email, password } = req.body;
 
-  async refreshToken(req) {
-    const { accessToken, refreshToken } = req.cookies;
+        // kiểm tra email xem tồn tại chưa
+        // nếu chưa tồn tại => từ chối, kêu người dùng đăng ký
+        // nếu mà tồn tại => đi xử lý tiếp
+        const userExist = await prisma.users.findUnique({
+            where: {
+                email: email,
+            },
+            omit: {
+                password: false,
+            },
+        });
 
-    if (!accessToken) {
-      throw new UnauthorizedException("Không có accessToken để kiểm tra");
-    }
+        if (!userExist) {
+            // throw new BadRequestException("Account Invalid.");
+            throw new BadRequestException("Người chưa tồn tại, vui lòng đăng ký");
+        }
 
-    if (!refreshToken) {
-      throw new UnauthorizedException("Không có refreshToken để kiểm tra.");
-    }
+        const isPassword = bcrypt.compareSync(password, userExist.password); // true
 
-    // tại vì accessToken đang bị hết hạn, FE đang muốn làm mới
-    // cho nên không được kiểm tra hạn của accessToken { ignoreExpiration: true }
-    const decodeAccessToken = tokenService.verifyaccessToken(accessToken, {
-      ignoreExpiration: true,
-    });
-    const decodeRefreshToken = tokenService.verifyRefreshToken(refreshToken);
-    if (decodeAccessToken.userId !== decodeRefreshToken.userId) {
-      throw new UnauthorizedException("Token không hợp lệ..");
-    }
+        if (!isPassword) {
+            // throw new BadRequestException("Account Invalid..");
+            throw new BadRequestException("Mật khẩu khống chính xác");
+        }
 
-    const userExits = await prisma.users.findUnique({
-      where: {
-        id: decodeAccessToken.userId,
-      },
-    });
+        const accessToken = tokenService.createAccessToken(userExist.id);
+        const refreshToken = tokenService.createRefreshToken(userExist.id);
 
-    const accessTokenNew = tokenService.createAccessToken(userExits.id);
-    const refreshTokenNew = tokenService.createRefreshToken(userExits.id);
+        // console.log({ email, password, userExist, isPassword });
 
-    return {
-      accessToken: accessTokenNew,
-      refreshToken: refreshTokenNew,
-    };
-  },
+        return {
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+        };
+    },
+
+    async getInfo(req) {
+        // console.log("getInfo service", req.user);
+
+        return req.user;
+    },
+
+    // FE gọi khi accessToken đang bị hết hạn
+    async refreshToken(req) {
+        const { accessToken, refreshToken } = req.cookies;
+
+        if (!accessToken) {
+            throw new UnauthorizedException("Không có accessToken để kiểm tra");
+        }
+
+        if (!refreshToken) {
+            throw new UnauthorizedException("Không có refreshToken để kiểm tra.");
+        }
+
+        // tại vì accessToken đang bị hết hạn, FE đang muốn làm mới
+        // cho nên không được kiểm tra hạn của accessToken { ignoreExpiration: true }
+        const decodeAccessToken = tokenService.verifyAccessToken(accessToken, { ignoreExpiration: true });
+        const decodeRefreshToken = tokenService.verifyRefreshToken(refreshToken);
+
+        if (decodeAccessToken.userId !== decodeRefreshToken.userId) {
+            throw new UnauthorizedException("Token không hợp lệ..");
+        }
+
+        const userExits = await prisma.users.findUnique({
+            where: {
+                id: decodeAccessToken.userId,
+            },
+        });
+
+        const accessTokenNew = tokenService.createAccessToken(userExits.id);
+        const refreshTokenNew = tokenService.createRefreshToken(userExits.id);
+
+        // thời hạn của refreshToken là 1 ngày
+
+        // Trường hợp 1: trả về cả cặp 2 token (rotate)
+        // refreshToken luôn được làm mới: tự động gia hạn thời gian login
+        // nếu trong 1 ngày, người dùng này không sử dụng => logout
+
+        // Trường hợp 2: trả về 1 accessToken
+        // refreshToken sẽ không được gia hạn
+        // đúng 1 ngày người dùng sẽ luôn phải login lại
+
+        // console.log({ accessToken, refreshToken, decodeAccessToken, decodeRefreshToken, userExits });
+
+        return {
+            accessToken: accessTokenNew,
+            refreshToken: refreshTokenNew,
+        };
+    },
 };

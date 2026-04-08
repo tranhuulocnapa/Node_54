@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from './generated/prisma/client';
+import { PrismaClient } from './generated/prisma/client.js';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { DATABASE_URL } from 'src/common/constant/app.constant';
 
@@ -7,7 +7,8 @@ import { DATABASE_URL } from 'src/common/constant/app.constant';
 export class PrismaService extends PrismaClient {
   constructor() {
     const url = new URL(DATABASE_URL as string);
-    console.log(url);
+    console.log({ url, database: url.pathname.substring(1) });
+
     const adapter = new PrismaMariaDb({
       user: url.username,
       password: url.password,
@@ -18,6 +19,7 @@ export class PrismaService extends PrismaClient {
 
     super({ adapter });
   }
+
   async onModuleInit() {
     try {
       await this.$queryRaw`SELECT 1+1 AS result`;
